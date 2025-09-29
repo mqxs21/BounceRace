@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections;
+using UnityEngine.SceneManagement;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -8,7 +9,7 @@ public class CarController : MonoBehaviour
     private float horizontalInput;
     private float verticalInput;
     private float steerAngle;
-    private bool isBreaking;
+    private bool isBreaking = false;
 
     public WheelCollider frontLeftWheelCollider;
     public WheelCollider frontRightWheelCollider;
@@ -30,12 +31,20 @@ public class CarController : MonoBehaviour
 
     public bool isGrounded = false;
 
+    public float lastVert = 0f;
+
+    public Vector3 normalGravity = new Vector3(0f, -20f, 0f);
+    public Vector3 leftSideGravity = new Vector3(-20f, 0f, 0f);
+    public Vector3 rightSideGravity = new Vector3(20f, 0f, 0f);
+    public Vector3 airGravity = new Vector3(0f, -50f, 0f);
+
     void Start()
     {
         carRigidbody = GetComponent<Rigidbody>();
         initalBodyRotation = bodyVisual.localEulerAngles;
-        carRigidbody.centerOfMass += new Vector3(0f, -1f, 0f); 
+        carRigidbody.centerOfMass += new Vector3(0f, -0.8f, 0f); 
         carRigidbody.maxAngularVelocity = 1.5f;
+        Physics.gravity = normalGravity;
 
     }
     private void FixedUpdate()
@@ -45,7 +54,7 @@ public class CarController : MonoBehaviour
         HandleSteering();
         UpdateWheels();
 
-        if (verticalInput == 0f)
+        if (verticalInput == 0f || isBreaking)
         {
             Debug.Log("Trying to brake");
             frontLeftWheelCollider.motorTorque = 0f;
@@ -83,7 +92,7 @@ public class CarController : MonoBehaviour
     public void CheckGround()
     {
         RaycastHit hit;
-        if (Physics.Raycast(transform.position, Vector3.down, out hit, 0.4f))
+        if (Physics.Raycast(transform.position, Vector3.down, out hit, 0.7f))
         {
             isGrounded = true;
         }
@@ -91,7 +100,7 @@ public class CarController : MonoBehaviour
         {
             isGrounded = false;
         }
-        Debug.DrawRay(transform.position, Vector3.down * 0.4f, Color.red);
+        Debug.DrawRay(transform.position, Vector3.down * 0.7f, Color.red);
     }
 
     void Update()
@@ -100,7 +109,26 @@ public class CarController : MonoBehaviour
         if (Input.GetKeyDown(KeyCode.Space) && isGrounded)
         {
             //JUMP!;
-            carRigidbody.linearVelocity += new Vector3(0f, 8f, 0f);
+            carRigidbody.linearVelocity += new Vector3(0f, 20f, 0f);
+        }
+        if (Input.GetKey(KeyCode.E))
+        {
+            isBreaking = true;
+        }else
+        {
+            isBreaking = false;
+        }
+
+        if (!isGrounded)
+        {
+            Physics.gravity = airGravity;
+        }else
+        {
+            Physics.gravity = normalGravity;
+        }
+        if (Input.GetKey(KeyCode.R))
+        {
+            SceneManager.LoadScene(SceneManager.GetActiveScene().name);
         }
     }
 
@@ -108,6 +136,7 @@ public class CarController : MonoBehaviour
     {
         horizontalInput = Input.GetAxis("Horizontal");
         verticalInput = -Input.GetAxis("Vertical");
+        lastVert = verticalInput;
         // isBreaking = Input.GetKey(KeyCode.Space);
     }
 
@@ -159,8 +188,8 @@ void ApplyAntiRoll(WheelCollider left, WheelCollider right, float stiffness)
     {
         frontLeftWheelCollider.motorTorque = verticalInput * motorForce;
         frontRightWheelCollider.motorTorque = verticalInput * motorForce;
-
-        brakeForce = isBreaking ? 3000f : 0f;
+        
+        brakeForce = 0f;
         frontLeftWheelCollider.brakeTorque = brakeForce;
         frontRightWheelCollider.brakeTorque = brakeForce;
         rearLeftWheelCollider.brakeTorque = brakeForce;
