@@ -61,35 +61,80 @@ public class CarController : MonoBehaviour
     private WheelFrictionCurve flSide0, frSide0, rlSide0, rrSide0;
     // =====================================================================
 
+    public Vector3 normalCOM;
+    public Vector3 airCOM;
+
+    public float driftElapsedTime = 0f;
+    public float timeToStartDriftEffect = 0.5f;
+
+    public ParticleSystem leftDriftEffect;
+    public ParticleSystem rightDriftEffect;
+
+    public float initYStartDrift = 0f;
+    public bool stopAngleChange = false;
+
+    // ===== NEW: Drift yaw clamp =====
+    [SerializeField] float maxDriftYaw = 20f;   // degrees allowed left/right from start
+    private float driftStartYaw;                // yaw (degrees) at drift start
+    // =================================
+    public float maxDriftTime = 2f;            // seconds
+
+    // ===== NEW: Drift staging (pose -> actual) + end boost =====
+    [Header("Drift Staging")]
+    public bool isDriftPosing = false;          // true during pre-drift pose
+    public float driftEndBoost = 8f;            // forward boost on successful end
+    private float driftPoseTimer = 0f;          // counts pose time
+    private float driftTotalTimer = 0f;         // counts total from initial press
+    private bool driftKeyWasHeld = false;       // input edge detection
+    private bool didActualDrift = false;        // whether we reached real drifting this cycle
+    // ===========================================================
+    public float lastDriftDir = 0f;
     void Start()
     {
         Application.targetFrameRate = 120;
         carRigidbody = GetComponent<Rigidbody>();
         initalBodyRotation = bodyVisual.localEulerAngles;
-        carRigidbody.centerOfMass += new Vector3(-0.3f, -0.8f, 0f); 
+        carRigidbody.centerOfMass += new Vector3(0f, -0.8f, -0.1f);
+        normalCOM = carRigidbody.centerOfMass;
+        airCOM = carRigidbody.centerOfMass + new Vector3(0f, 0f, -0.5f);
         carRigidbody.maxAngularVelocity = 1.5f;
         Physics.gravity = normalGravity;
 
         // ===== DRIFT: cache original friction curves =====
-        flFwd0  = frontLeftWheelCollider.forwardFriction;
-        frFwd0  = frontRightWheelCollider.forwardFriction;
-        rlFwd0  = rearLeftWheelCollider.forwardFriction;
-        rrFwd0  = rearRightWheelCollider.forwardFriction;
+        flFwd0 = frontLeftWheelCollider.forwardFriction;
+        frFwd0 = frontRightWheelCollider.forwardFriction;
+        rlFwd0 = rearLeftWheelCollider.forwardFriction;
+        rrFwd0 = rearRightWheelCollider.forwardFriction;
 
         flSide0 = frontLeftWheelCollider.sidewaysFriction;
         frSide0 = frontRightWheelCollider.sidewaysFriction;
         rlSide0 = rearLeftWheelCollider.sidewaysFriction;
         rrSide0 = rearRightWheelCollider.sidewaysFriction;
         // ================================================
+        leftDriftEffect.Stop();
+        rightDriftEffect.Stop();
+
+        TuneFriction(frontLeftWheelCollider,  2.3f, 2.1f);
+        TuneFriction(frontRightWheelCollider, 2.3f, 2.1f);
+        TuneFriction(rearLeftWheelCollider,   2.2f, 1.9f);
+        TuneFriction(rearRightWheelCollider,  2.2f, 1.9f);
     }
+
     private void FixedUpdate()
     {
-        GetInput();
+        Debug.Log(carRigidbody.linearVelocity.magnitude);
+        
         HandleMotor();
         HandleSteering();
         UpdateWheels();
 
-        // ===== DRIFT: keep your original brake block but don't run it while drifting =====
+        if (stopAngleChange)
+        {
+            Vector3 currentRotation = transform.rotation.eulerAngles;
+            currentRotation.y = initYStartDrift + (maxSteeringAngle * horizontalInput * 1.5f);
+            transform.rotation = Quaternion.Euler(currentRotation);
+        }
+
         if (!isDrifting && (verticalInput == 0f || isBreaking))
         {
             Debug.Log("Trying to brake");
@@ -102,28 +147,31 @@ public class CarController : MonoBehaviour
 
             float newMagnitude = Mathf.Lerp(currentVelocity.magnitude, 0, Time.deltaTime * 4f);
             currentVelocity = currentVelocity.normalized * newMagnitude;
-            currentVelocity.y = carRigidbody.linearVelocity.y; // preserve y velocity for jumps/gravity
+            currentVelocity.y = carRigidbody.linearVelocity.y;
             carRigidbody.linearVelocity = currentVelocity;
-            
+
             frontLeftWheelCollider.brakeTorque = carRigidbody.linearVelocity.magnitude;
             frontRightWheelCollider.brakeTorque = carRigidbody.linearVelocity.magnitude;
             rearLeftWheelCollider.brakeTorque = carRigidbody.linearVelocity.magnitude;
             rearRightWheelCollider.brakeTorque = carRigidbody.linearVelocity.magnitude;
         }
 
-        // ===== DRIFT: apply drift friction, yaw assist, and forward speed limit =====
         if (isDrifting)
         {
-            // soften rear grip, boost front bite
-            SetStiffness(rearLeftWheelCollider,  rlFwd0.stiffness  * rearForwardStiffness,  rlSide0.stiffness * rearSidewaysStiffness);
-            SetStiffness(rearRightWheelCollider, rrFwd0.stiffness  * rearForwardStiffness,  rrSide0.stiffness * rearSidewaysStiffness);
-            SetStiffness(frontLeftWheelCollider, flFwd0.stiffness,                           flSide0.stiffness * frontSidewaysBoost);
-            SetStiffness(frontRightWheelCollider,frFwd0.stiffness,                           frSide0.stiffness * frontSidewaysBoost);
+            SetStiffness(rearLeftWheelCollider, rlFwd0.stiffness * rearForwardStiffness, rlSide0.stiffness * rearSidewaysStiffness);
+            SetStiffness(rearRightWheelCollider, rrFwd0.stiffness * rearForwardStiffness, rrSide0.stiffness * rearSidewaysStiffness);
+            SetStiffness(frontLeftWheelCollider, flFwd0.stiffness, flSide0.stiffness * frontSidewaysBoost);
+            SetStiffness(frontRightWheelCollider, frFwd0.stiffness, frSide0.stiffness * frontSidewaysBoost);
 
-            // extra yaw to help sustain drift in steer direction
-            carRigidbody.AddTorque(Vector3.up * horizontalInput * driftYawPower, ForceMode.Acceleration);
+            if (horizontalInput > 0)
+            {
+                carRigidbody.AddTorque(Vector3.up * horizontalInput * driftYawPower, ForceMode.Acceleration);
+            }
+            else if (horizontalInput < 0)
+            {
+                carRigidbody.AddTorque(Vector3.up * horizontalInput * driftYawPower, ForceMode.Acceleration);
+            }
 
-            // cap only the forward component (so you can steer without rocketing forward)
             Vector3 v = carRigidbody.linearVelocity;
             float vLong = Vector3.Dot(v, transform.forward);
             if (vLong > driftMaxLongitudinalSpeed)
@@ -134,10 +182,23 @@ public class CarController : MonoBehaviour
         }
         else
         {
-            // restore original grip
             RestoreFriction();
+            // keep stopAngleChange as set by pose logic
         }
-        // ===============================================================================
+
+        // === NEW: clamp yaw while drifting ===
+        if (isDrifting)
+        {
+            float currentYaw = transform.eulerAngles.y;
+            float deltaFromStart = Mathf.DeltaAngle(driftStartYaw, currentYaw);
+            float clampedDelta = Mathf.Clamp(deltaFromStart, -maxDriftYaw, maxDriftYaw);
+            float targetYaw = driftStartYaw + clampedDelta;
+
+            Vector3 e = transform.eulerAngles;
+            e.y = targetYaw;
+            carRigidbody.MoveRotation(Quaternion.Euler(e));
+        }
+        // =====================================
 
         if (Mathf.Abs(horizontalInput) >= 0.1f)
         {
@@ -147,16 +208,24 @@ public class CarController : MonoBehaviour
         {
             bodyVisual.localEulerAngles = initalBodyRotation;
         }
-        if (carRigidbody.linearVelocity.magnitude> maxSpeed)
+        if (carRigidbody.linearVelocity.magnitude > maxSpeed)
         {
             carRigidbody.linearVelocity = carRigidbody.linearVelocity.normalized * maxSpeed;
+        }
+        if (isGrounded)
+        {
+            carRigidbody.centerOfMass = normalCOM;
+        }
+        else
+        {
+            carRigidbody.centerOfMass = airCOM;
         }
     }
 
     public void CheckGround()
     {
         RaycastHit hit;
-        if (Physics.Raycast(transform.position, Vector3.down, out hit, 0.7f))
+        if (Physics.Raycast(transform.position, Vector3.down, out hit, 1f))
         {
             isGrounded = true;
         }
@@ -164,33 +233,117 @@ public class CarController : MonoBehaviour
         {
             isGrounded = false;
         }
-        Debug.DrawRay(transform.position, Vector3.down * 0.7f, Color.red);
+        Debug.DrawRay(transform.position, Vector3.down * 1f, Color.red);
     }
 
     void Update()
     {
+        GetInput();
         CheckGround();
         if (Input.GetKeyDown(KeyCode.Space) && isGrounded)
         {
-            //JUMP!;
             carRigidbody.linearVelocity += new Vector3(0f, 20f, 0f);
         }
         if (Input.GetKey(KeyCode.E))
         {
             isBreaking = true;
-        }else
+        }
+        else
         {
             isBreaking = false;
         }
 
-        // ===== DRIFT: read drift key (only allow when grounded) =====
-        isDrifting = Input.GetKey(driftKey) && isGrounded;
-        // ============================================================
+        // =================== NEW: Drift staging logic ===================
+        bool driftHeld = Input.GetKey(driftKey);
+        bool canDrift = isGrounded && horizontalInput != 0;
+
+        // initial press -> start "pose"
+        if (driftHeld && !driftKeyWasHeld && canDrift && !isDrriftActiveAny())
+        {
+            isDriftPosing = true;
+            isDrifting = false;
+            didActualDrift = false;
+            driftPoseTimer = 0f;
+            driftTotalTimer = 0f;
+
+            initYStartDrift = transform.eulerAngles.y; // store yaw
+            driftStartYaw = initYStartDrift;
+
+            stopAngleChange = true; // lock into drift pose
+        }
+
+        // while posing
+        if (isDriftPosing)
+        {
+            driftPoseTimer += Time.deltaTime;
+            driftTotalTimer += Time.deltaTime;
+
+            // after 0.5s of posing -> actual drifting
+            if (driftPoseTimer >= timeToStartDriftEffect && canDrift && driftHeld)
+            {
+                isDriftPosing = false;
+                isDrifting = true;
+                didActualDrift = true;
+                lastDriftDir = horizontalInput;
+                stopAngleChange = false; // free rotation for the drift physics
+
+                driftElapsedTime = 0f;   // reset effect timer for VFX gating
+                carRigidbody.linearVelocity += new Vector3(0f, 4f, 0f); // your original "enter drift" pop
+            }
+        }
+
+        // while actually drifting
+        if (isDrifting)
+        {
+            driftElapsedTime += Time.deltaTime;   // keeps your VFX timing intact (0.5s after actual drift)
+            driftTotalTimer += Time.deltaTime;
+
+            bool timeUp = driftTotalTimer >= maxDriftTime;
+            bool released = !driftHeld;
+
+            if (timeUp || released || !canDrift)
+            {
+                // exiting real drift -> apply boost
+                if (didActualDrift)
+                {
+                    carRigidbody.linearVelocity -= transform.forward * driftEndBoost;
+
+                  carRigidbody.linearVelocity -= transform.right * (lastDriftDir * driftEndBoost * 0.5f);
+                }
+
+                isDrifting = false;
+                isDriftPosing = false;
+                didActualDrift = false;
+                stopAngleChange = false;
+                driftPoseTimer = 0f;
+                driftTotalTimer = 0f;
+            }
+        }
+
+        // if key released early during pose (never reached actual drift) -> just cancel pose
+        if (!driftHeld && isDriftPosing)
+        {
+            isDriftPosing = false;
+            stopAngleChange = false;
+            driftPoseTimer = 0f;
+            driftTotalTimer = 0f;
+            didActualDrift = false;
+        }
+
+        // no drift state -> reset timers used by VFX gating
+        if (!isDriftPosing && !isDrifting)
+        {
+            driftElapsedTime = 0f;
+        }
+
+        driftKeyWasHeld = driftHeld;
+        // ================================================================
 
         if (!isGrounded)
         {
             Physics.gravity = airGravity;
-        }else
+        }
+        else
         {
             Physics.gravity = normalGravity;
         }
@@ -198,6 +351,49 @@ public class CarController : MonoBehaviour
         {
             SceneManager.LoadScene(SceneManager.GetActiveScene().name);
         }
+        if (isDrifting && driftElapsedTime > timeToStartDriftEffect)
+        {
+            if (horizontalInput > 0)
+            {
+                leftDriftEffect.Play();
+                rightDriftEffect.Stop();
+            }
+            else
+            {
+                leftDriftEffect.Stop();
+                rightDriftEffect.Play();
+            }
+        }
+        else
+        {
+            leftDriftEffect.Stop();
+            rightDriftEffect.Stop();
+        }
+    }
+
+    // helper to know if any drift state is currently active
+    private bool isDrriftActiveAny()
+    {
+        return isDriftPosing || isDrifting;
+    }
+
+    void TuneFriction(WheelCollider wc, float fStiff=2.2f, float sStiff=2.0f)
+    {
+        var f = wc.forwardFriction;
+        f.extremumSlip   = 0.35f;
+        f.extremumValue  = 1.20f;
+        f.asymptoteSlip  = 0.80f;
+        f.asymptoteValue = 1.00f;
+        f.stiffness      = fStiff;
+        wc.forwardFriction = f;
+
+        var s = wc.sidewaysFriction;
+        s.extremumSlip   = 0.18f;
+        s.extremumValue  = 1.00f;
+        s.asymptoteSlip  = 0.45f;
+        s.asymptoteValue = 0.80f;
+        s.stiffness      = sStiff;
+        wc.sidewaysFriction = s;
     }
 
     private void GetInput()
@@ -205,31 +401,22 @@ public class CarController : MonoBehaviour
         horizontalInput = Input.GetAxis("Horizontal");
         verticalInput = -Input.GetAxis("Vertical");
         lastVert = verticalInput;
-        // isBreaking = Input.GetKey(KeyCode.Space);
     }
 
-    private float yawBrake = 10f; // tweak 10–40
+    private float yawBrake = 10f;
 
     private void HandleSteering()
     {
-        // ===== DRIFT: stronger steering while drifting =====
+        // steer harder during real drift; pose uses stopAngleChange in FixedUpdate
         steerAngle = maxSteeringAngle * horizontalInput * (isDrifting ? driftSteerMultiplier : 1f);
-        // ===================================================
 
         frontLeftWheelCollider.steerAngle  = steerAngle * 0.5f;
         frontRightWheelCollider.steerAngle = steerAngle * 0.5f;
 
-        // When no steer input, gently brake ONLY yaw so car stops turning
         if (Mathf.Abs(horizontalInput) < 0.01f)
         {
-            // current angular velocity
             Vector3 w = carRigidbody.angularVelocity;
-
-            // extract yaw component (about world up)
             float yaw = Vector3.Dot(w, Vector3.up);
-
-            // apply opposite torque proportional to yaw (doesn't touch linear speed)
-            // ForceMode.Acceleration is mass-independent and smooth.
             carRigidbody.AddTorque(-Vector3.up * yaw * yawBrake, ForceMode.Acceleration);
         }
     }
@@ -253,29 +440,30 @@ public class CarController : MonoBehaviour
 
     private void HandleMotor()
     {
-        // ===== DRIFT: special motor/brake behavior =====
         if (isDrifting)
         {
             frontLeftWheelCollider.motorTorque  = verticalInput * motorForce * driftTorqueMultiplier;
             frontRightWheelCollider.motorTorque = verticalInput * motorForce * driftTorqueMultiplier;
 
-            // rear “handbrake” to keep rear loose
             frontLeftWheelCollider.brakeTorque  = 0f;
             frontRightWheelCollider.brakeTorque = 0f;
             rearLeftWheelCollider.brakeTorque   = handbrakeTorque;
             rearRightWheelCollider.brakeTorque  = handbrakeTorque;
             return;
         }
-        // =================================================
 
         frontLeftWheelCollider.motorTorque = verticalInput * motorForce;
         frontRightWheelCollider.motorTorque = verticalInput * motorForce;
 
-        brakeForce =  verticalInput >= 0 ? 2000f : 0;
-        frontLeftWheelCollider.brakeTorque = brakeForce;
-        frontRightWheelCollider.brakeTorque = brakeForce;
-        rearLeftWheelCollider.brakeTorque = brakeForce;
-        rearRightWheelCollider.brakeTorque = brakeForce;
+       // HandleMotor()
+bool playerBraking = isBreaking || (verticalInput > 0.1f); // pressing reverse counts as brake
+float appliedBrake = playerBraking ? 2000f : 0f;
+
+frontLeftWheelCollider.brakeTorque  = appliedBrake;
+frontRightWheelCollider.brakeTorque = appliedBrake;
+rearLeftWheelCollider.brakeTorque   = appliedBrake;
+rearRightWheelCollider.brakeTorque  = appliedBrake;
+
     }
 
     private void UpdateWheels()
@@ -295,7 +483,6 @@ public class CarController : MonoBehaviour
         trans.position = pos;
     }
 
-    // ===== DRIFT: helpers to adjust/restore stiffness only =====
     void SetStiffness(WheelCollider wc, float fwd, float side)
     {
         var f = wc.forwardFriction;  f.stiffness = fwd;  wc.forwardFriction = f;
@@ -314,5 +501,4 @@ public class CarController : MonoBehaviour
         rearLeftWheelCollider.sidewaysFriction   = rlSide0;
         rearRightWheelCollider.sidewaysFriction  = rrSide0;
     }
-    // ===========================================================
 }
