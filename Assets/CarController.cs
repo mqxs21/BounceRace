@@ -69,6 +69,7 @@ public class CarController : MonoBehaviour
 
     public ParticleSystem leftDriftEffect;
     public ParticleSystem rightDriftEffect;
+    public ParticleSystem boostEffect;
 
     public float initYStartDrift = 0f;
     public bool stopAngleChange = false;
@@ -128,33 +129,39 @@ public class CarController : MonoBehaviour
         HandleSteering();
         UpdateWheels();
 
-        if (stopAngleChange)
+        if (stopAngleChange && !isDriftPosing)
         {
             Vector3 currentRotation = transform.rotation.eulerAngles;
             currentRotation.y = initYStartDrift + (maxSteeringAngle * horizontalInput * 1.5f);
             transform.rotation = Quaternion.Euler(currentRotation);
         }
+        else if (stopAngleChange && isDriftPosing)
+        {
+            Vector3 currentRotation = transform.rotation.eulerAngles;
+            currentRotation.y = initYStartDrift + (maxSteeringAngle * horizontalInput * 1.5f);
+            transform.rotation = Quaternion.Slerp(transform.rotation, Quaternion.Euler(currentRotation), Time.deltaTime * 10f);
+        }
 
         if (!isDrifting && (verticalInput == 0f || isBreaking))
-        {
-            Debug.Log("Trying to brake");
-            frontLeftWheelCollider.motorTorque = 0f;
-            frontRightWheelCollider.motorTorque = 0f;
-            rearLeftWheelCollider.motorTorque = 0f;
-            rearRightWheelCollider.motorTorque = 0f;
+            {
+                Debug.Log("Trying to brake");
+                frontLeftWheelCollider.motorTorque = 0f;
+                frontRightWheelCollider.motorTorque = 0f;
+                rearLeftWheelCollider.motorTorque = 0f;
+                rearRightWheelCollider.motorTorque = 0f;
 
-            Vector3 currentVelocity = carRigidbody.linearVelocity;
+                Vector3 currentVelocity = carRigidbody.linearVelocity;
 
-            float newMagnitude = Mathf.Lerp(currentVelocity.magnitude, 0, Time.deltaTime * 4f);
-            currentVelocity = currentVelocity.normalized * newMagnitude;
-            currentVelocity.y = carRigidbody.linearVelocity.y;
-            carRigidbody.linearVelocity = currentVelocity;
+                float newMagnitude = Mathf.Lerp(currentVelocity.magnitude, 0, Time.deltaTime * 4f);
+                currentVelocity = currentVelocity.normalized * newMagnitude;
+                currentVelocity.y = carRigidbody.linearVelocity.y;
+                carRigidbody.linearVelocity = currentVelocity;
 
-            frontLeftWheelCollider.brakeTorque = carRigidbody.linearVelocity.magnitude;
-            frontRightWheelCollider.brakeTorque = carRigidbody.linearVelocity.magnitude;
-            rearLeftWheelCollider.brakeTorque = carRigidbody.linearVelocity.magnitude;
-            rearRightWheelCollider.brakeTorque = carRigidbody.linearVelocity.magnitude;
-        }
+                frontLeftWheelCollider.brakeTorque = carRigidbody.linearVelocity.magnitude;
+                frontRightWheelCollider.brakeTorque = carRigidbody.linearVelocity.magnitude;
+                rearLeftWheelCollider.brakeTorque = carRigidbody.linearVelocity.magnitude;
+                rearRightWheelCollider.brakeTorque = carRigidbody.linearVelocity.magnitude;
+            }
 
         if (isDrifting)
         {
@@ -265,6 +272,7 @@ public class CarController : MonoBehaviour
             didActualDrift = false;
             driftPoseTimer = 0f;
             driftTotalTimer = 0f;
+            carRigidbody.linearVelocity += new Vector3(0f, 10f, 0f);
 
             initYStartDrift = transform.eulerAngles.y; // store yaw
             driftStartYaw = initYStartDrift;
@@ -288,7 +296,7 @@ public class CarController : MonoBehaviour
                 stopAngleChange = false; // free rotation for the drift physics
 
                 driftElapsedTime = 0f;   // reset effect timer for VFX gating
-                carRigidbody.linearVelocity += new Vector3(0f, 4f, 0f); // your original "enter drift" pop
+                 // your original "enter drift" pop
             }
         }
 
@@ -306,11 +314,11 @@ public class CarController : MonoBehaviour
                 // exiting real drift -> apply boost
                 if (didActualDrift)
                 {
-                    carRigidbody.linearVelocity -= transform.forward * driftEndBoost;
+                    carRigidbody.linearVelocity -= transform.forward * driftEndBoost * 1.5f;
 
-                  carRigidbody.linearVelocity -= transform.right * (lastDriftDir * driftEndBoost * 0.5f);
+                  carRigidbody.linearVelocity += transform.right * (lastDriftDir * driftEndBoost * 0.4f);
                 }
-
+                boostEffect.Play();
                 isDrifting = false;
                 isDriftPosing = false;
                 didActualDrift = false;
