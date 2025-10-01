@@ -248,7 +248,9 @@ public class CarController : MonoBehaviour
         }
         else
         {
-            bodyVisual.localEulerAngles = initalBodyRotation;
+            float tilt = bodyVisual.localEulerAngles.z;
+            tilt = Mathf.LerpAngle(tilt, initalBodyRotation.z, Time.deltaTime * 10f);
+             bodyVisual.localEulerAngles = new Vector3(initalBodyRotation.x, initalBodyRotation.y, tilt);
         }
         if (carRigidbody.linearVelocity.magnitude > maxSpeed)
         {
