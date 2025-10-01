@@ -242,7 +242,9 @@ public class CarController : MonoBehaviour
 
         if (Mathf.Abs(horizontalInput) >= 0.1f)
         {
-            bodyVisual.localEulerAngles = new Vector3(initalBodyRotation.x, initalBodyRotation.y, steerAngle * 0.3f * bodyVisualMultiplier);
+            float tilt = bodyVisual.localEulerAngles.z;
+            tilt = Mathf.LerpAngle(tilt, steerAngle * 0.3f * bodyVisualMultiplier, Time.deltaTime * 10f);
+             bodyVisual.localEulerAngles = new Vector3(initalBodyRotation.x, initalBodyRotation.y, tilt);
         }
         else
         {
@@ -512,10 +514,10 @@ public class CarController : MonoBehaviour
             {
                 horizontalInput = 1;
             }
-            carRigidbody.linearVelocity += transform.forward * 0.8f;
+            carRigidbody.linearVelocity += transform.forward * (Mathf.Lerp(4f, 0.4f, velocity /maxSpeed));
             Vector3 flattened = Vector3.ProjectOnPlane(colHit.normal, Vector3.up); //flatten the collision vector(not really that important)
             float signedAngle = Vector3.SignedAngle(flattened, -transform.forward, Vector3.up); //get the difference of angle between car forward and the collision, so we know what angle the car struck wall
-            carRigidbody.angularVelocity -= Math.Sign(signedAngle) * Vector3.up * 5f;
+            carRigidbody.angularVelocity -= Math.Sign(signedAngle) * Vector3.up * 9f;
 
         }
         Debug.DrawRay(transform.position, -transform.forward * frontRayCastDist, Color.red);
