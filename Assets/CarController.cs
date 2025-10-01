@@ -4,6 +4,7 @@ using UnityEngine.SceneManagement;
 using System.Collections.Generic;
 using UnityEngine;
 using TMPro;
+using UnityEngine.U2D;
 
 public class CarController : MonoBehaviour
 {
@@ -72,6 +73,8 @@ public class CarController : MonoBehaviour
     public ParticleSystem leftDriftEffect;
     public ParticleSystem rightDriftEffect;
     public ParticleSystem boostEffect;
+    public ParticleSystem windEffect;
+    public ParticleSystem vfxBoostEffect;
 
     public float initYStartDrift = 0f;
     public bool stopAngleChange = false;
@@ -94,6 +97,9 @@ public class CarController : MonoBehaviour
     public float lastDriftDir = 0f;
 
     public float bodyVisualMultiplier = 2f;
+
+    public float windMaxRadius = 43f;
+    public float windMinRadius = 33f;
 
     public bool leftBackWheelIsGrounded = false;
     public bool rightBackWheelIsGrounded = false;
@@ -129,10 +135,12 @@ public class CarController : MonoBehaviour
         leftDriftEffect.Stop();
         rightDriftEffect.Stop();
 
-        TuneFriction(frontLeftWheelCollider,  2.3f, 2.1f);
+        TuneFriction(frontLeftWheelCollider, 2.3f, 2.1f);
         TuneFriction(frontRightWheelCollider, 2.3f, 2.1f);
-        TuneFriction(rearLeftWheelCollider,   2.2f, 1.9f);
-        TuneFriction(rearRightWheelCollider,  2.2f, 1.9f);
+        TuneFriction(rearLeftWheelCollider, 2.2f, 1.9f);
+        TuneFriction(rearRightWheelCollider, 2.2f, 1.9f);
+
+        maxSpeed /= 3.6f; //convert from km/h
     }
 
     private void FixedUpdate()
@@ -144,18 +152,25 @@ public class CarController : MonoBehaviour
         UpdateWheels();
         velocity = carRigidbody.linearVelocity.magnitude; // km/h
 
-        if (stopAngleChange && !isDriftPosing)
+        if (stopAngleChange && !isDriftPosing && !isDrifting)
+        {
+            //in drift turning
+            Vector3 currentRotation = transform.rotation.eulerAngles;
+            currentRotation.y = initYStartDrift + (maxSteeringAngle * horizontalInput * 1.5f);
+            transform.rotation = Quaternion.Slerp(transform.rotation, Quaternion.Euler(currentRotation), Time.deltaTime * 2f);
+        }
+      /*  else if (stopAngleChange && isDriftPosing)
         {
             Vector3 currentRotation = transform.rotation.eulerAngles;
             currentRotation.y = initYStartDrift + (maxSteeringAngle * horizontalInput * 1.5f);
-            transform.rotation = Quaternion.Euler(currentRotation);
+            transform.rotation = Quaternion.Slerp(transform.rotation, Quaternion.Euler(currentRotation), Time.deltaTime * 2f);
         }
-        else if (stopAngleChange && isDriftPosing)
+        else if (stopAngleChange && !isDriftPosing && isDrifting)
         {
             Vector3 currentRotation = transform.rotation.eulerAngles;
             currentRotation.y = initYStartDrift + (maxSteeringAngle * horizontalInput * 1.5f);
-            transform.rotation = Quaternion.Slerp(transform.rotation, Quaternion.Euler(currentRotation), Time.deltaTime * 10f);
-        }
+            transform.rotation = Quaternion.Slerp(transform.rotation, Quaternion.Euler(currentRotation), Time.deltaTime * 2f);
+        }*/
 
         if (!isDrifting && (verticalInput == 0f || isBreaking))
             {
@@ -291,6 +306,17 @@ public class CarController : MonoBehaviour
     {
         GetInput();
         CheckGround();
+        var shapeModule = windEffect.shape;
+        shapeModule.radius = Mathf.Lerp(windMaxRadius, windMinRadius, velocity / maxSpeed);
+        if (velocity <= 3)
+        {
+            shapeModule.radius = 100;
+            windEffect.Stop();
+        }
+        else
+        {
+            windEffect.Play();
+        }
         speedText.text = ((int)(CarController.velocity * 3.6)).ToString() + " km/h";
         if (Input.GetKeyDown(KeyCode.Space) && isGrounded)
         {
@@ -364,6 +390,7 @@ public class CarController : MonoBehaviour
                   carRigidbody.linearVelocity += transform.right * (lastDriftDir * driftEndBoost * 0.4f);
                 }
                 boostEffect.Play();
+                vfxBoostEffect.Play();
                 isDrifting = false;
                 isDriftPosing = false;
                 didActualDrift = false;
@@ -430,7 +457,7 @@ public class CarController : MonoBehaviour
         return isDriftPosing || isDrifting;
     }
 
-    void TuneFriction(WheelCollider wc, float fStiff=2.2f, float sStiff=2.0f)
+    void TuneFriction(WheelCollider wc, float fStiff=3f, float sStiff=3f)
     {
         var f = wc.forwardFriction;
         f.extremumSlip   = 0.35f;
