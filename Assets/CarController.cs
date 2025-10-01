@@ -3,9 +3,11 @@ using System.Collections;
 using UnityEngine.SceneManagement;
 using System.Collections.Generic;
 using UnityEngine;
+using TMPro;
 
 public class CarController : MonoBehaviour
 {
+    public static float velocity;
     private float horizontalInput;
     private float verticalInput;
     private float steerAngle;
@@ -90,6 +92,18 @@ public class CarController : MonoBehaviour
     private bool didActualDrift = false;        // whether we reached real drifting this cycle
     // ===========================================================
     public float lastDriftDir = 0f;
+
+    public float bodyVisualMultiplier = 2f;
+
+    public bool leftBackWheelIsGrounded = false;
+    public bool rightBackWheelIsGrounded = false;
+
+    public TrailRenderer leftBackWheelTrail;
+    public TrailRenderer rightBackWheelTrail;
+
+    // UI ELEMENTS ===========================================================
+    public TextMeshProUGUI speedText;
+    // ===========================================================
     void Start()
     {
         Application.targetFrameRate = 120;
@@ -128,6 +142,7 @@ public class CarController : MonoBehaviour
         HandleMotor();
         HandleSteering();
         UpdateWheels();
+        velocity = carRigidbody.linearVelocity.magnitude; // km/h
 
         if (stopAngleChange && !isDriftPosing)
         {
@@ -209,7 +224,7 @@ public class CarController : MonoBehaviour
 
         if (Mathf.Abs(horizontalInput) >= 0.1f)
         {
-            bodyVisual.localEulerAngles = new Vector3(initalBodyRotation.x, initalBodyRotation.y, steerAngle * 0.3f);
+            bodyVisual.localEulerAngles = new Vector3(initalBodyRotation.x, initalBodyRotation.y, steerAngle * 0.3f * bodyVisualMultiplier);
         }
         else
         {
@@ -228,7 +243,7 @@ public class CarController : MonoBehaviour
             carRigidbody.centerOfMass = airCOM;
         }
     }
-
+    public float wheelCastDist = 0.35f;
     public void CheckGround()
     {
         RaycastHit hit;
@@ -241,12 +256,42 @@ public class CarController : MonoBehaviour
             isGrounded = false;
         }
         Debug.DrawRay(transform.position, Vector3.down * 1f, Color.red);
+
+        
+
+        RaycastHit leftWheelHit;
+        if (Physics.Raycast(rearLeftWheelTransform.position, Vector3.down, out leftWheelHit, wheelCastDist))
+        {
+            leftBackWheelIsGrounded = true;
+            leftBackWheelTrail.emitting = true;
+            Debug.Log(leftWheelHit.collider.name);
+        }
+        else
+        {
+            leftBackWheelIsGrounded = false;
+            leftBackWheelTrail.emitting = false;
+        }
+        Debug.DrawRay(rearLeftWheelTransform.position, Vector3.down * wheelCastDist, Color.blue);
+
+        RaycastHit rightWheelHit;
+        if (Physics.Raycast(rearRightWheelTransform.position, Vector3.down, out rightWheelHit, wheelCastDist))
+        {
+            rightBackWheelIsGrounded = true;
+            rightBackWheelTrail.emitting = true;
+        }
+        else
+        {
+            rightBackWheelIsGrounded = false;
+            rightBackWheelTrail.emitting = false;
+        }
+        Debug.DrawRay(rearRightWheelTransform.position, Vector3.down * wheelCastDist, Color.blue);
     }
 
     void Update()
     {
         GetInput();
         CheckGround();
+        speedText.text = ((int)(CarController.velocity * 3.6)).ToString() + " km/h";
         if (Input.GetKeyDown(KeyCode.Space) && isGrounded)
         {
             carRigidbody.linearVelocity += new Vector3(0f, 20f, 0f);
