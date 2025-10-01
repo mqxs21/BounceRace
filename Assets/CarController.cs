@@ -27,6 +27,7 @@ public class CarController : MonoBehaviour
     public float motorForce = 50f;
     public float brakeForce = 0f;
     public float maxSpeed = 100;
+    public float maxSpeedHardCap = 150;
 
     public Rigidbody carRigidbody;
 
@@ -247,7 +248,12 @@ public class CarController : MonoBehaviour
         }
         if (carRigidbody.linearVelocity.magnitude > maxSpeed)
         {
-            carRigidbody.linearVelocity = carRigidbody.linearVelocity.normalized * maxSpeed;
+            float targetMag = Mathf.Lerp(carRigidbody.linearVelocity.magnitude, maxSpeed, Time.deltaTime * 10f);
+            carRigidbody.linearVelocity = carRigidbody.linearVelocity.normalized * targetMag;
+            if (carRigidbody.linearVelocity.magnitude > maxSpeedHardCap)
+            {
+                carRigidbody.linearVelocity = carRigidbody.linearVelocity.normalized * maxSpeedHardCap;
+            }
         }
         if (isGrounded)
         {
@@ -317,10 +323,17 @@ public class CarController : MonoBehaviour
         {
             windEffect.Play();
         }
-        speedText.text = ((int)(CarController.velocity * 3.6)).ToString() + " km/h";
+        speedText.text = ((int)(CarController.velocity * 3.6)).ToString();
+        speedText.color = Color.Lerp(Color.white, Color.yellow, velocity / maxSpeed);
+        speedText.fontSize = Mathf.Lerp(32, 37, velocity / maxSpeed);
         if (Input.GetKeyDown(KeyCode.Space) && isGrounded)
         {
             carRigidbody.linearVelocity += new Vector3(0f, 20f, 0f);
+            Boost(20);
+        }
+        if (Input.GetKeyDown(KeyCode.E) && isGrounded)
+        {
+            Boost(30);
         }
         if (Input.GetKey(KeyCode.E))
         {
@@ -455,6 +468,12 @@ public class CarController : MonoBehaviour
     private bool isDrriftActiveAny()
     {
         return isDriftPosing || isDrifting;
+    }
+    public void Boost(float force)
+    {
+        boostEffect.Play();
+        vfxBoostEffect.Play();
+        carRigidbody.linearVelocity -= transform.forward * force;
     }
 
     void TuneFriction(WheelCollider wc, float fStiff=3f, float sStiff=3f)
