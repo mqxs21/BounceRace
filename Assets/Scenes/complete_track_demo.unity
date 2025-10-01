@@ -11352,6 +11352,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Track
       objectReference: {fileID: 0}
+    - target: {fileID: 8297061156760403158, guid: 8c7f9ec2f0a5d440aad6fa1863a28a14, type: 3}
+      propertyPath: m_Enabled
+      value: 1
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []

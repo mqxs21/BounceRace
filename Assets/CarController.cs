@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using TMPro;
 using UnityEngine.U2D;
+using UnityEditor.Rendering;
 
 public class CarController : MonoBehaviour
 {
@@ -146,6 +147,7 @@ public class CarController : MonoBehaviour
 
     private void FixedUpdate()
     {
+        GetInput();
         Debug.Log(carRigidbody.linearVelocity.magnitude);
         
         HandleMotor();
@@ -310,7 +312,7 @@ public class CarController : MonoBehaviour
 
     void Update()
     {
-        GetInput();
+        
         CheckGround();
         var shapeModule = windEffect.shape;
         shapeModule.radius = Mathf.Lerp(windMaxRadius, windMinRadius, velocity / maxSpeed);
@@ -494,11 +496,29 @@ public class CarController : MonoBehaviour
         s.stiffness      = sStiff;
         wc.sidewaysFriction = s;
     }
-
+    public float frontRayCastDist = 3f;
     private void GetInput()
     {
         horizontalInput = Input.GetAxis("Horizontal");
+        
         verticalInput = -Input.GetAxis("Vertical");
+
+        if (Physics.Raycast(transform.position, -transform.forward, out RaycastHit colHit, frontRayCastDist))
+        {
+            //Against a wall, so help player back up
+            Debug.Log("back up");
+            verticalInput = 1;
+            if (horizontalInput == 0)
+            {
+                horizontalInput = 1;
+            }
+            carRigidbody.linearVelocity += transform.forward * 0.8f;
+            Vector3 flattened = Vector3.ProjectOnPlane(colHit.normal, Vector3.up); //flatten the collision vector(not really that important)
+            float signedAngle = Vector3.SignedAngle(flattened, -transform.forward, Vector3.up); //get the difference of angle between car forward and the collision, so we know what angle the car struck wall
+            carRigidbody.angularVelocity -= Math.Sign(signedAngle) * Vector3.up * 5f;
+
+        }
+        Debug.DrawRay(transform.position, -transform.forward * frontRayCastDist, Color.red);
         lastVert = verticalInput;
     }
 
