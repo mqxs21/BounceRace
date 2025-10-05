@@ -95,6 +95,7 @@ public class CarController : MonoBehaviour
     private float driftTotalTimer = 0f;         // counts total from initial press
     private bool driftKeyWasHeld = false;       // input edge detection
     private bool didActualDrift = false;        // whether we reached real drifting this cycle
+    private float driftTotalTime = 0f;
     // ===========================================================
     public float lastDriftDir = 0f;
 
@@ -368,6 +369,7 @@ public class CarController : MonoBehaviour
             driftStartYaw = initYStartDrift;
 
             stopAngleChange = true; // lock into drift pose
+            driftTotalTime = 0f;
         }
 
         // while posing
@@ -375,7 +377,7 @@ public class CarController : MonoBehaviour
         {
             driftPoseTimer += Time.deltaTime;
             driftTotalTimer += Time.deltaTime;
-
+            driftTotalTime += Time.deltaTime;
             // after 0.5s of posing -> actual drifting
             if (driftPoseTimer >= timeToStartDriftEffect && canDrift && driftHeld)
             {
@@ -395,7 +397,7 @@ public class CarController : MonoBehaviour
         {
             driftElapsedTime += Time.deltaTime;   // keeps your VFX timing intact (0.5s after actual drift)
             driftTotalTimer += Time.deltaTime;
-
+            driftTotalTime += Time.deltaTime;
             bool timeUp = driftTotalTimer >= maxDriftTime;
             bool released = !driftHeld;
 
@@ -406,7 +408,7 @@ public class CarController : MonoBehaviour
                 {
                     carRigidbody.linearVelocity -= transform.forward * driftEndBoost * 1.5f;
 
-                  carRigidbody.linearVelocity += transform.right * (lastDriftDir * driftEndBoost * 0.4f);
+                    carRigidbody.linearVelocity += transform.right * (lastDriftDir * driftEndBoost * 0.1f * driftTotalTime);
                 }
                 boostEffect.Play();
                 vfxBoostEffect.Play();
@@ -416,6 +418,7 @@ public class CarController : MonoBehaviour
                 stopAngleChange = false;
                 driftPoseTimer = 0f;
                 driftTotalTimer = 0f;
+                driftTotalTime = 0f;
             }
         }
 

@@ -490,10 +490,14 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   target: {fileID: 531011906}
   offset: {x: 0, y: 2, z: 4}
+  povOffset: {x: 0, y: 0.3, z: 0}
+  regularOffset: {x: 0, y: 2, z: 4}
   positionDamping: 8
   rotationDamping: 10
   positionDeadZone: 0.08
   rotationDeadZoneDeg: 0.3
+  freeRotation: 1
+  inPOV: 0
 --- !u!114 &354533040
 MonoBehaviour:
   m_ObjectHideFlags: 0
