@@ -82,7 +82,7 @@ public class CarController : MonoBehaviour
     public bool stopAngleChange = false;
 
     // ===== NEW: Drift yaw clamp =====
-    [SerializeField] float maxDriftYaw = 20f;   // degrees allowed left/right from start
+    [SerializeField] float maxDriftYaw = 60f;   // degrees allowed left/right from start
     private float driftStartYaw;                // yaw (degrees) at drift start
     // =================================
     public float maxDriftTime = 2f;            // seconds
@@ -100,6 +100,7 @@ public class CarController : MonoBehaviour
     public float lastDriftDir = 0f;
 
     public float bodyVisualMultiplier = 2f;
+    public float bodyVisualMultiplierDrift = 2f;
 
     public float windMaxRadius = 43f;
     public float windMinRadius = 33f;
@@ -107,12 +108,17 @@ public class CarController : MonoBehaviour
     public bool leftBackWheelIsGrounded = false;
     public bool rightBackWheelIsGrounded = false;
 
+    public float stuckYawIfOppositeHeld = 0f;
+
     public TrailRenderer leftBackWheelTrail;
     public TrailRenderer rightBackWheelTrail;
 
     // UI ELEMENTS ===========================================================
     public TextMeshProUGUI speedText;
     // ===========================================================
+    public LayerMask excludePushLayers;
+
+    public bool stopTurnTorque = false;
     void Start()
     {
         Application.targetFrameRate = 120;
@@ -149,7 +155,7 @@ public class CarController : MonoBehaviour
     private void FixedUpdate()
     {
         GetInput();
-        Debug.Log(carRigidbody.linearVelocity.magnitude);
+//        Debug.Log(carRigidbody.linearVelocity.magnitude);
         
         HandleMotor();
         HandleSteering();
@@ -163,19 +169,26 @@ public class CarController : MonoBehaviour
             currentRotation.y = initYStartDrift + (maxSteeringAngle * horizontalInput * 1.5f);
             transform.rotation = Quaternion.Slerp(transform.rotation, Quaternion.Euler(currentRotation), Time.deltaTime * 2f);
         }
-      /*  else if (stopAngleChange && isDriftPosing)
+        /*  else if (stopAngleChange && isDriftPosing)
+          {
+              Vector3 currentRotation = transform.rotation.eulerAngles;
+              currentRotation.y = initYStartDrift + (maxSteeringAngle * horizontalInput * 1.5f);
+              transform.rotation = Quaternion.Slerp(transform.rotation, Quaternion.Euler(currentRotation), Time.deltaTime * 2f);
+          }
+          else if (stopAngleChange && !isDriftPosing && isDrifting)
+          {
+              Vector3 currentRotation = transform.rotation.eulerAngles;
+              currentRotation.y = initYStartDrift + (maxSteeringAngle * horizontalInput * 1.5f);
+              transform.rotation = Quaternion.Slerp(transform.rotation, Quaternion.Euler(currentRotation), Time.deltaTime * 2f);
+          }*/
+        if (horizontalInput != 0)
         {
-            Vector3 currentRotation = transform.rotation.eulerAngles;
-            currentRotation.y = initYStartDrift + (maxSteeringAngle * horizontalInput * 1.5f);
-            transform.rotation = Quaternion.Slerp(transform.rotation, Quaternion.Euler(currentRotation), Time.deltaTime * 2f);
+            carRigidbody.AddTorque(Vector3.up * horizontalInput * driftYawPower * 2, ForceMode.Force);
         }
-        else if (stopAngleChange && !isDriftPosing && isDrifting)
+        else
         {
-            Vector3 currentRotation = transform.rotation.eulerAngles;
-            currentRotation.y = initYStartDrift + (maxSteeringAngle * horizontalInput * 1.5f);
-            transform.rotation = Quaternion.Slerp(transform.rotation, Quaternion.Euler(currentRotation), Time.deltaTime * 2f);
-        }*/
-
+            
+        }
         if (!isDrifting && (verticalInput == 0f || isBreaking))
             {
                 Debug.Log("Trying to brake");
@@ -203,6 +216,11 @@ public class CarController : MonoBehaviour
             SetStiffness(rearRightWheelCollider, rrFwd0.stiffness * rearForwardStiffness, rrSide0.stiffness * rearSidewaysStiffness);
             SetStiffness(frontLeftWheelCollider, flFwd0.stiffness, flSide0.stiffness * frontSidewaysBoost);
             SetStiffness(frontRightWheelCollider, frFwd0.stiffness, frSide0.stiffness * frontSidewaysBoost);
+            if (stopTurnTorque)
+            {
+                SetStiffness(frontLeftWheelCollider, flFwd0.stiffness, flSide0.stiffness * 10f);
+                carRigidbody.linearVelocity -=  horizontalInput* transform.right * 2f;
+            }
 
             if (horizontalInput > 0)
             {
@@ -232,26 +250,68 @@ public class CarController : MonoBehaviour
         {
             float currentYaw = transform.eulerAngles.y;
             float deltaFromStart = Mathf.DeltaAngle(driftStartYaw, currentYaw);
-            float clampedDelta = Mathf.Clamp(deltaFromStart, -maxDriftYaw, maxDriftYaw);
+            float dynMaxDriftYaw = maxDriftYaw;
+            if (horizontalInput > 0 && Input.GetKey(KeyCode.A))
+            {
+                //drifting right while holding left
+                Debug.Log("drifting right while holding left");
+                stopTurnTorque = true;
+                if (stuckYawIfOppositeHeld == 0f)
+                {
+                    stuckYawIfOppositeHeld = currentYaw;
+                }
+                else
+                {
+                    dynMaxDriftYaw = currentYaw;
+                }
+
+            }
+            else if (horizontalInput < 0 && Input.GetKey(KeyCode.D))
+            {
+                //drifting left while holding right
+                Debug.Log("drifting left while holding right");
+                stopTurnTorque = true;
+                if (stuckYawIfOppositeHeld == 0f)
+                {
+                    stuckYawIfOppositeHeld = currentYaw;
+                }
+                else
+                {
+                    dynMaxDriftYaw = currentYaw;
+                }
+
+            }
+            else
+            {
+                stopTurnTorque = false;
+            }
+            float clampedDelta = Mathf.Clamp(deltaFromStart, -dynMaxDriftYaw, dynMaxDriftYaw);
             float targetYaw = driftStartYaw + clampedDelta;
 
             Vector3 e = transform.eulerAngles;
             e.y = targetYaw;
-            carRigidbody.MoveRotation(Quaternion.Euler(e));
+
+
+
+        }
+        else
+        {
+            stuckYawIfOppositeHeld = 0f;
+            stopTurnTorque = false;
         }
         // =====================================
 
         if (Mathf.Abs(horizontalInput) >= 0.1f)
         {
             float tilt = bodyVisual.localEulerAngles.z;
-            tilt = Mathf.LerpAngle(tilt, steerAngle * 0.3f * bodyVisualMultiplier, Time.deltaTime * 10f);
-             bodyVisual.localEulerAngles = new Vector3(initalBodyRotation.x, initalBodyRotation.y, tilt);
+            tilt = Mathf.LerpAngle(tilt, steerAngle * 0.3f * (isDrifting ? bodyVisualMultiplierDrift * 4 : bodyVisualMultiplier), Time.deltaTime * 10f);
+            bodyVisual.localEulerAngles = new Vector3(initalBodyRotation.x, initalBodyRotation.y, tilt);
         }
         else
         {
             float tilt = bodyVisual.localEulerAngles.z;
             tilt = Mathf.LerpAngle(tilt, initalBodyRotation.z, Time.deltaTime * 10f);
-             bodyVisual.localEulerAngles = new Vector3(initalBodyRotation.x, initalBodyRotation.y, tilt);
+            bodyVisual.localEulerAngles = new Vector3(initalBodyRotation.x, initalBodyRotation.y, tilt);
         }
         if (carRigidbody.linearVelocity.magnitude > maxSpeed)
         {
@@ -292,7 +352,7 @@ public class CarController : MonoBehaviour
         {
             leftBackWheelIsGrounded = true;
             leftBackWheelTrail.emitting = true;
-            Debug.Log(leftWheelHit.collider.name);
+//            Debug.Log(leftWheelHit.collider.name);
         }
         else
         {
@@ -353,7 +413,7 @@ public class CarController : MonoBehaviour
 
         // =================== NEW: Drift staging logic ===================
         bool driftHeld = Input.GetKey(driftKey);
-        bool canDrift = isGrounded && horizontalInput != 0;
+        bool canDrift = isGrounded && horizontalInput != 0 && verticalInput != 0;
 
         // initial press -> start "pose"
         if (driftHeld && !driftKeyWasHeld && canDrift && !isDrriftActiveAny())
@@ -363,7 +423,7 @@ public class CarController : MonoBehaviour
             didActualDrift = false;
             driftPoseTimer = 0f;
             driftTotalTimer = 0f;
-            carRigidbody.linearVelocity += new Vector3(0f, 10f, 0f);
+            carRigidbody.linearVelocity += new Vector3(0f, 16f, 0f);
 
             initYStartDrift = transform.eulerAngles.y; // store yaw
             driftStartYaw = initYStartDrift;
@@ -509,10 +569,12 @@ public class CarController : MonoBehaviour
         horizontalInput = Input.GetAxis("Horizontal");
         
         verticalInput = -Input.GetAxis("Vertical");
-
-        if (Physics.Raycast(transform.position, -transform.forward, out RaycastHit colHit, frontRayCastDist))
+        int mask = ~excludePushLayers;
+        if (Physics.Raycast(transform.position + transform.up.normalized * 0.5f, -transform.forward, out RaycastHit colHit, frontRayCastDist, mask) && colHit.collider.gameObject.layer != excludePushLayers)
         {
             //Against a wall, so help player back up
+            Debug.Log(colHit.collider.gameObject.name);
+            Debug.Log(colHit.collider.gameObject.layer);
             Debug.Log("back up");
             verticalInput = 1;
             if (horizontalInput == 0)
@@ -534,6 +596,12 @@ public class CarController : MonoBehaviour
     private void HandleSteering()
     {
         // steer harder during real drift; pose uses stopAngleChange in FixedUpdate
+        if (stopTurnTorque)
+        {
+            frontLeftWheelCollider.steerAngle = 0f;
+            frontRightWheelCollider.steerAngle = 0f;
+            return;
+        }
         steerAngle = maxSteeringAngle * horizontalInput * (isDrifting ? driftSteerMultiplier : 1f);
 
         frontLeftWheelCollider.steerAngle  = steerAngle * 0.5f;
