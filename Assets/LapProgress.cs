@@ -21,8 +21,9 @@ public class LapProgress : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
-        lapTimeElapsed += Time.deltaTime;
-        lapTimeText.text = ((int)(lapTimeElapsed)).ToString();
+        if(GameManager.gameStarted) lapTimeElapsed += Time.deltaTime;
+        string formattedTime = ((float)(lapTimeElapsed)).ToString("F2");
+        lapTimeText.text = formattedTime.ToString();
         lapText.text = ((int)(currentLap)).ToString() + "/" + ((int)(totalLaps)).ToString();
     }
     public void CheckPointReached(int checkpointIndex, bool isFinish = false)

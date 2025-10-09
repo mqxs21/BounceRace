@@ -151,12 +151,36 @@ public class CarController : MonoBehaviour
 
         maxSpeed /= 3.6f; //convert from km/h
     }
+    public void StartCar()
+    {
+        carRigidbody.constraints = RigidbodyConstraints.None;
+        if (Input.GetAxis("Vertical") != 0)
+        {
+            Boost(30);
+            leftDriftEffect.Stop();
+            rightDriftEffect.Stop();
+        }
+    }
 
     private void FixedUpdate()
     {
+        if (!GameManager.gameStarted)
+        {
+            carRigidbody.linearVelocity = Vector3.zero;
+            if (Input.GetAxis("Vertical") > 0)
+            {
+                if (leftDriftEffect.isPlaying == false)
+                {
+                    leftDriftEffect.Play();
+                    rightDriftEffect.Play();
+                }
+                boostEffect.Play();
+            }
+            
+        }
         GetInput();
-//        Debug.Log(carRigidbody.linearVelocity.magnitude);
-        
+        //        Debug.Log(carRigidbody.linearVelocity.magnitude);
+
         HandleMotor();
         HandleSteering();
         UpdateWheels();
@@ -187,28 +211,28 @@ public class CarController : MonoBehaviour
         }
         else
         {
-            
+
         }
         if (!isDrifting && (verticalInput == 0f || isBreaking))
-            {
-                Debug.Log("Trying to brake");
-                frontLeftWheelCollider.motorTorque = 0f;
-                frontRightWheelCollider.motorTorque = 0f;
-                rearLeftWheelCollider.motorTorque = 0f;
-                rearRightWheelCollider.motorTorque = 0f;
+        {
+            Debug.Log("Trying to brake");
+            frontLeftWheelCollider.motorTorque = 0f;
+            frontRightWheelCollider.motorTorque = 0f;
+            rearLeftWheelCollider.motorTorque = 0f;
+            rearRightWheelCollider.motorTorque = 0f;
 
-                Vector3 currentVelocity = carRigidbody.linearVelocity;
+            Vector3 currentVelocity = carRigidbody.linearVelocity;
 
-                float newMagnitude = Mathf.Lerp(currentVelocity.magnitude, 0, Time.deltaTime * 4f);
-                currentVelocity = currentVelocity.normalized * newMagnitude;
-                currentVelocity.y = carRigidbody.linearVelocity.y;
-                carRigidbody.linearVelocity = currentVelocity;
+            float newMagnitude = Mathf.Lerp(currentVelocity.magnitude, 0, Time.deltaTime * 4f);
+            currentVelocity = currentVelocity.normalized * newMagnitude;
+            currentVelocity.y = carRigidbody.linearVelocity.y;
+            carRigidbody.linearVelocity = currentVelocity;
 
-                frontLeftWheelCollider.brakeTorque = carRigidbody.linearVelocity.magnitude;
-                frontRightWheelCollider.brakeTorque = carRigidbody.linearVelocity.magnitude;
-                rearLeftWheelCollider.brakeTorque = carRigidbody.linearVelocity.magnitude;
-                rearRightWheelCollider.brakeTorque = carRigidbody.linearVelocity.magnitude;
-            }
+            frontLeftWheelCollider.brakeTorque = carRigidbody.linearVelocity.magnitude;
+            frontRightWheelCollider.brakeTorque = carRigidbody.linearVelocity.magnitude;
+            rearLeftWheelCollider.brakeTorque = carRigidbody.linearVelocity.magnitude;
+            rearRightWheelCollider.brakeTorque = carRigidbody.linearVelocity.magnitude;
+        }
 
         if (isDrifting)
         {
@@ -219,7 +243,7 @@ public class CarController : MonoBehaviour
             if (stopTurnTorque)
             {
                 SetStiffness(frontLeftWheelCollider, flFwd0.stiffness, flSide0.stiffness * 10f);
-                carRigidbody.linearVelocity -=  horizontalInput* transform.right * 2f;
+                carRigidbody.linearVelocity -= horizontalInput * transform.right * 2f;
             }
 
             if (horizontalInput > 0)

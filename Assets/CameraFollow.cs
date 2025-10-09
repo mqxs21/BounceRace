@@ -1,5 +1,4 @@
-﻿
-using UnityEngine;
+﻿using UnityEngine;
 
 public class CameraFollow : MonoBehaviour
 {
@@ -18,6 +17,12 @@ public class CameraFollow : MonoBehaviour
 
     public bool freeRotation = true;
     public bool inPOV = false;
+
+    // ▶ Added:
+    [Header("Pre-start creep")]
+    public bool gameStarted = false;                 // Set this true when your game starts
+    [SerializeField, Min(0f)] float startApproachSpeed = 0.5f; // m/s while game hasn't started
+
     void Update()
     {
         if (Input.GetKeyDown(KeyCode.V))
@@ -35,6 +40,7 @@ public class CameraFollow : MonoBehaviour
             }
         }
     }
+
     void LateUpdate()
     {
         if (!target) return;
@@ -42,23 +48,33 @@ public class CameraFollow : MonoBehaviour
         // desired position: offset in target local space
         Vector3 desiredPos = target.TransformPoint(offset);
 
-        // dead-zone
-        Vector3 delta = desiredPos - transform.position;
-        if (delta.sqrMagnitude > positionDeadZone * positionDeadZone || inPOV)
+        if (!gameStarted)
         {
-            // exponential smoothing (frame-rate independent)
-            float t = 1f - Mathf.Exp(-positionDamping * Time.deltaTime);
-            transform.position = Vector3.Lerp(transform.position, desiredPos, t);
+            // ▶ Before game starts: move very slowly toward the target position (frame-rate independent).
+            transform.position = Vector3.MoveTowards(
+                transform.position,
+                desiredPos,
+                startApproachSpeed * Time.deltaTime
+            );
         }
-        
-        // desired rotation: look at target
+        else
+        {
+            // ▶ After game starts: your normal smoothed follow with dead-zone
+            Vector3 delta = desiredPos - transform.position;
+            if (delta.sqrMagnitude > positionDeadZone * positionDeadZone || inPOV)
+            {
+                float t = 1f - Mathf.Exp(-positionDamping * Time.deltaTime);
+                transform.position = Vector3.Lerp(transform.position, desiredPos, t);
+            }
+        }
+
+        // desired rotation: look at target (unchanged)
         Quaternion desiredRot = Quaternion.LookRotation(target.position - transform.position, Vector3.up);
         if (!freeRotation)
         {
             desiredRot = Quaternion.Euler(-target.eulerAngles);
         }
 
-        // dead-zone for rotation
         float ang = Quaternion.Angle(transform.rotation, desiredRot);
         if (ang > rotationDeadZoneDeg || inPOV)
         {
