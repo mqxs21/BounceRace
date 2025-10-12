@@ -77,6 +77,9 @@ public class CarController : MonoBehaviour
     public ParticleSystem boostEffect;
     public ParticleSystem windEffect;
     public ParticleSystem vfxBoostEffect;
+    public AudioSource boostSound;
+    private float initalBoostPitch;
+    private float boostVolume = 0;
 
     public float initYStartDrift = 0f;
     public bool stopAngleChange = false;
@@ -85,6 +88,7 @@ public class CarController : MonoBehaviour
     [SerializeField] float maxDriftYaw = 60f;   // degrees allowed left/right from start
     private float driftStartYaw;                // yaw (degrees) at drift start
     // =================================
+    public bool isTurning = false;
     public float maxDriftTime = 2f;            // seconds
 
     // ===== NEW: Drift staging (pose -> actual) + end boost =====
@@ -119,6 +123,8 @@ public class CarController : MonoBehaviour
     public LayerMask excludePushLayers;
 
     public bool stopTurnTorque = false;
+
+    public bool canMove = true;
     void Start()
     {
         Application.targetFrameRate = 120;
@@ -150,6 +156,7 @@ public class CarController : MonoBehaviour
         TuneFriction(rearRightWheelCollider, 2.2f, 1.9f);
 
         maxSpeed /= 3.6f; //convert from km/h
+        initalBoostPitch = boostSound.pitch;
     }
     public void StartCar()
     {
@@ -164,6 +171,13 @@ public class CarController : MonoBehaviour
 
     private void FixedUpdate()
     {
+        if (!canMove)
+        {
+            float targetMag = Mathf.Lerp(carRigidbody.linearVelocity.magnitude, 0, Time.deltaTime * 10f);
+            carRigidbody.linearVelocity = carRigidbody.linearVelocity.normalized * targetMag;
+            boostSound.enabled = false;
+            return;
+        }
         if (!GameManager.gameStarted)
         {
             carRigidbody.linearVelocity = Vector3.zero;
@@ -173,8 +187,16 @@ public class CarController : MonoBehaviour
                 {
                     leftDriftEffect.Play();
                     rightDriftEffect.Play();
+
+
+                }
+                if (boostSound.isPlaying == false)
+                {
+                    boostSound.Play();
                 }
                 boostEffect.Play();
+                
+                
             }
             
         }
@@ -419,7 +441,7 @@ public class CarController : MonoBehaviour
         speedText.fontSize = Mathf.Lerp(32, 37, velocity / maxSpeed);
         if (Input.GetKeyDown(KeyCode.Space) && isGrounded)
         {
-            carRigidbody.linearVelocity += new Vector3(0f, 20f, 0f);
+            carRigidbody.linearVelocity += new Vector3(0f, 30f, 0f);
             Boost(20);
         }
         if (Input.GetKeyDown(KeyCode.E) && isGrounded)
@@ -472,10 +494,15 @@ public class CarController : MonoBehaviour
                 stopAngleChange = false; // free rotation for the drift physics
 
                 driftElapsedTime = 0f;   // reset effect timer for VFX gating
-                 // your original "enter drift" pop
+                                         // your original "enter drift" pop
             }
         }
-
+        if (GameManager.gameStarted)
+        {
+            boostVolume = Mathf.Lerp(boostVolume, 0f, Time.deltaTime);
+            boostSound.volume = boostVolume;
+        }
+        
         // while actually drifting
         if (isDrifting)
         {
@@ -490,11 +517,11 @@ public class CarController : MonoBehaviour
                 // exiting real drift -> apply boost
                 if (didActualDrift)
                 {
-                    carRigidbody.linearVelocity -= transform.forward * driftEndBoost * 1.5f;
+                    Boost(driftEndBoost * 1.5f);
 
                     carRigidbody.linearVelocity += transform.right * (lastDriftDir * driftEndBoost * 0.1f * driftTotalTime);
                 }
-                boostEffect.Play();
+                
                 vfxBoostEffect.Play();
                 isDrifting = false;
                 isDriftPosing = false;
@@ -566,6 +593,9 @@ public class CarController : MonoBehaviour
     {
         boostEffect.Play();
         vfxBoostEffect.Play();
+        boostVolume = 1;
+        boostSound.pitch = initalBoostPitch + UnityEngine.Random.Range(-0.2f,0.2f);
+        boostSound.Play();
         carRigidbody.linearVelocity -= transform.forward * force;
     }
 
@@ -591,8 +621,9 @@ public class CarController : MonoBehaviour
     private void GetInput()
     {
         horizontalInput = Input.GetAxis("Horizontal");
-        
+
         verticalInput = -Input.GetAxis("Vertical");
+        isTurning = horizontalInput != 0;
         int mask = ~excludePushLayers;
         if (Physics.Raycast(transform.position + transform.up.normalized * 0.5f, -transform.forward, out RaycastHit colHit, frontRayCastDist, mask) && colHit.collider.gameObject.layer != excludePushLayers)
         {

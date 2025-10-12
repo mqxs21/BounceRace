@@ -13,9 +13,13 @@ public class LapProgress : MonoBehaviour
     public TextMeshProUGUI lapTimeText;
 
     public TextMeshProUGUI lapText;
+
+    public static bool gameIsDone = false;
+    public CarController carController;
+    
     void Start()
     {
-
+        gameIsDone = false;
     }
 
     // Update is called once per frame
@@ -43,6 +47,11 @@ public class LapProgress : MonoBehaviour
     {
         if (currentCheckpoint == totalCheckpoints && isFinish)
         {
+            if (currentLap == totalLaps)
+            {
+                FinishGame();
+                return;
+            }
             currentLap++;
             currentCheckpoint = 1;
             if (lapTimeElapsed < bestLapTime)
@@ -51,5 +60,10 @@ public class LapProgress : MonoBehaviour
             }
             lapTimeElapsed = 0f;
         }
+    }
+    void FinishGame()
+    {
+        gameIsDone = true;
+        carController.canMove = false;
     }
 }
