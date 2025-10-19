@@ -623,6 +623,12 @@ public class CarController : MonoBehaviour
         horizontalInput = Input.GetAxis("Horizontal");
 
         verticalInput = -Input.GetAxis("Vertical");
+
+        if (LapProgress.gameIsFinalDone)
+        {
+            verticalInput = 0;
+            horizontalInput = 0;
+        }
         isTurning = horizontalInput != 0;
         int mask = ~excludePushLayers;
         if (Physics.Raycast(transform.position + transform.up.normalized * 0.5f, -transform.forward, out RaycastHit colHit, frontRayCastDist, mask) && colHit.collider.gameObject.layer != excludePushLayers)
