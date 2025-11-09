@@ -1,11 +1,13 @@
 using System;
 using System.Collections;
 using TMPro;
+using Unity.VisualScripting;
 using UnityEngine;
 using UnityEngine.UI;
 
 public class GameManager : MonoBehaviour
 {
+    public static bool initalCutscenePlayed;
     public static bool gameStarted;
     public CarController carController;
 
@@ -14,20 +16,32 @@ public class GameManager : MonoBehaviour
     public Image panelColor;
     public TextMeshProUGUI textMeshProUGUI;
     public CameraFollow camFollow;
+    public AnimationClip initalCutsceneAnim;
+    public Animator camAnimator;
     void Start()
     {
         gameStarted = false;
-        
+        if (!initalCutscenePlayed)
+        {
+            carController.gameObject.SetActive(false);
+            camAnimator.enabled = true;
+            camFollow.enabled = false;
+            StartCoroutine(InitalCutscene());
+        }
     }
 
     // Update is called once per frame
     void Update()
     {
+        if (!initalCutscenePlayed)
+        {
+            return;
+        }
         if (!gameStarted)
         {
             startGameAfter -= Time.deltaTime;
             Color targetColor = panelColor.color;
-            targetColor.a = Mathf.Lerp(0.7f, 0.02f, 1/startGameAfter);
+            targetColor.a = Mathf.Lerp(0.1f, 0.02f, 1 / startGameAfter);
             panelColor.color = targetColor;
 
             textMeshProUGUI.text = Math.Ceiling((double)startGameAfter).ToString();
@@ -42,5 +56,14 @@ public class GameManager : MonoBehaviour
             carController.StartCar();
             camFollow.gameStarted = true;
         }
+    }
+    public IEnumerator InitalCutscene()
+    {
+        camAnimator.Play(initalCutsceneAnim.name);
+        yield return new WaitForSeconds(initalCutsceneAnim.length);
+        initalCutscenePlayed = true;
+        carController.gameObject.SetActive(true);
+        camAnimator.enabled = false;
+        camFollow.enabled = true;
     }
 }
