@@ -4118,7 +4118,7 @@ MonoBehaviour:
   currentLap: 1
   currentCheckpoint: 0
   totalCheckpoints: 2
-  totalLaps: 1
+  totalLaps: 2
   lapTimeElapsed: 0
   bestLapTime: 0
   lapTimeText: {fileID: 1753008204}
