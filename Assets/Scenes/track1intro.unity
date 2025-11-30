@@ -93,7 +93,7 @@ LightmapSettings:
     m_ExportTrainingData: 0
     m_TrainingDataDestination: TrainingData
     m_LightProbeSampleCountMultiplier: 4
-  m_LightingDataAsset: {fileID: 112000000, guid: 7636017eb2d0d400bba9c60c6f7c5d03, type: 2}
+  m_LightingDataAsset: {fileID: 112000000, guid: ccf6664462ac7472e921c2b0c5525823, type: 2}
   m_LightingSettings: {fileID: 4890085278179872738, guid: 6df264e0cde874588b524b4e303661bc, type: 2}
 --- !u!196 &4
 NavMeshSettings:
@@ -5104,8 +5104,12 @@ MonoBehaviour:
   carController: {fileID: 0}
   startGameAfter: 3
   panelColor: {fileID: 1375624499}
-  textMeshProUGUI: {fileID: 1438236556}
+  countdownText: {fileID: 0}
   camFollow: {fileID: 0}
+  initalCutsceneAnim: {fileID: 0}
+  camAnimator: {fileID: 0}
+  lapProgress: {fileID: 0}
+  countdownSound: {fileID: 0}
 --- !u!4 &744005894
 Transform:
   m_ObjectHideFlags: 0
