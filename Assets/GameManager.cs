@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using TMPro;
 using Unity.VisualScripting;
 using UnityEngine;
@@ -14,19 +15,28 @@ public class GameManager : MonoBehaviour
     public float startGameAfter = 3;
 
     public Image panelColor;
-    public TextMeshProUGUI textMeshProUGUI;
+    public TextMeshProUGUI countdownText;
     public CameraFollow camFollow;
     public AnimationClip initalCutsceneAnim;
     public Animator camAnimator;
+    public LapProgress lapProgress;
+    public AudioSource countdownSound;
+    public List<List<GameObject>> objectsForLaps;
     void Start()
     {
         gameStarted = false;
+        RenderSettings.fogDensity = 0.001f;
         if (!initalCutscenePlayed)
         {
             carController.gameObject.SetActive(false);
             camAnimator.enabled = true;
             camFollow.enabled = false;
             StartCoroutine(InitalCutscene());
+        }else
+        {
+            // restart the lap, already played cutscene before
+            countdownSound.Play();
+            RenderSettings.fogDensity = 0.003f;
         }
     }
 
@@ -44,7 +54,7 @@ public class GameManager : MonoBehaviour
             targetColor.a = Mathf.Lerp(0.1f, 0.02f, 1 / startGameAfter);
             panelColor.color = targetColor;
 
-            textMeshProUGUI.text = Math.Ceiling((double)startGameAfter).ToString();
+            countdownText.text = Math.Ceiling((double)startGameAfter).ToString();
         }
 
         if (startGameAfter <= 0 && !gameStarted)
@@ -52,7 +62,7 @@ public class GameManager : MonoBehaviour
             gameStarted = true;
             carController.enabled = true;
             panelColor.enabled = false;
-            textMeshProUGUI.text = "";
+            countdownText.text = "";
             carController.StartCar();
             camFollow.gameStarted = true;
         }
@@ -65,5 +75,7 @@ public class GameManager : MonoBehaviour
         carController.gameObject.SetActive(true);
         camAnimator.enabled = false;
         camFollow.enabled = true;
+        countdownSound.Play();
+        RenderSettings.fogDensity = 0.003f;
     }
 }
