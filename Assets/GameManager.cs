@@ -70,7 +70,8 @@ public class GameManager : MonoBehaviour
     public IEnumerator InitalCutscene()
     {
         camAnimator.Play(initalCutsceneAnim.name);
-        yield return new WaitForSeconds(initalCutsceneAnim.length);
+       yield return new WaitForSeconds(initalCutsceneAnim.length);
+       //yield return new WaitForSeconds(1);
         initalCutscenePlayed = true;
         carController.gameObject.SetActive(true);
         camAnimator.enabled = false;

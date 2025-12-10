@@ -15,7 +15,7 @@ RenderSettings:
   m_ObjectHideFlags: 0
   serializedVersion: 10
   m_Fog: 1
-  m_FogColor: {r: 0.83095354, g: 0.8160377, b: 1, a: 1}
+  m_FogColor: {r: 1, g: 1, b: 1, a: 1}
   m_FogMode: 3
   m_FogDensity: 0.003
   m_LinearFogStart: 0
@@ -4268,7 +4268,7 @@ MonoBehaviour:
   currentLap: 1
   currentCheckpoint: 0
   totalCheckpoints: 2
-  totalLaps: 2
+  totalLaps: 1
   lapTimeElapsed: 0
   bestLapTime: 0
   lapTimeText: {fileID: 1753008204}
@@ -17500,7 +17500,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 11
   m_Type: 1
-  m_Color: {r: 0.8396226, g: 0.71233374, b: 0.629717, a: 1}
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_Intensity: 1.6
   m_Range: 10
   m_SpotAngle: 30
